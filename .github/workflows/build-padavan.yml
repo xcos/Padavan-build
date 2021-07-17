@@ -165,7 +165,7 @@ jobs:
         age: '1 day'
         skip-recent: 5
     - name: PushPlus Notification
-      uses: xcos/Action_PushPlus@master
+      uses: vb1980/Action_PushPlus@master
       if: steps.organize.outputs.status == 'success' && github.event.inputs.pushplus == 'true'
       with:
         token: ${{ secrets.PUSHTOKEN }}
