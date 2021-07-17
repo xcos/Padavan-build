@@ -12,7 +12,7 @@ on:
       modelname:
         description: 'model name'
         required: true
-        default: 'HC5962'
+        default: 'K2P-USB'
   release:
     types: [published]
   push:
