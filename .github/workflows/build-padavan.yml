@@ -13,6 +13,28 @@ on:
         description: 'model name'
         required: true
         default: 'K2P-USB'
+      firmwarever:
+        description: 'firmware''s version'
+        required: true
+        default: '20210710'
+      rainbowui:
+        description: 'whether to apply rainbow ui'
+        required: true
+        default: 'true'
+      uploadcow:
+        description: 'whether to upload firmware to cowtransfer'
+        required: true
+        default: 'true'
+      uploadwet:
+        description: 'whether to upload firmware to wettransfer'
+        required: true
+        default: 'false'
+      pushplus:
+        description: 'whether to notify through pushplus'
+        required: true
+        default: 'false'        
+        
+        
   release:
     types: [published]
   push:
@@ -117,8 +139,35 @@ jobs:
         sudo ./build_firmware_modify $TNAME 0
         sudo mv -f images/*.trx /opt/images/
     - name : Upload packages
-      uses: actions/upload-artifact@master
-      if: always()
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success'
       with:
         name: Padavan-packages
-        path: /opt/images
+        path: ${{ env.FIRMWARE }}
+    - name: Upload firmware to cowtransfer
+      if: steps.organize.outputs.status == 'success' && github.event.inputs.uploadcow == 'true'
+      run: |
+        curl -fsSL git.io/file-transfer | sh
+        ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
+        echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
+        echo "COWTRANSFER_URL=$(cat cowtransfer.log | grep -o -E "https?://[a-zA-Z0-9\.\/_&=@$%?~#-]*")" >> $GITHUB_ENV
+    - name: Upload firmware to WeTransfer
+      if: steps.organize.outputs.status == 'success' && github.event.inputs.uploadwet == 'true'
+      run: |
+        curl -fsSL git.io/file-transfer | sh
+        ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
+        echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
+        echo "WETRANSFER_URL=$(cat wetransfer.log | grep -o -E "https?://[a-zA-Z0-9\.\/_&=@$%?~#-]*")" >> $GITHUB_ENV
+    - name: Remove obsolete firmwares on artifacts
+      uses: c-hive/gha-remove-artifacts@v1.2.0
+      if: steps.organizer.outputs.status == 'success'
+      with:
+        age: '1 day'
+        skip-recent: 5
+    - name: PushPlus Notification
+      uses: xcos/Action_PushPlus@master
+      if: steps.organize.outputs.status == 'success' && github.event.inputs.pushplus == 'true'
+      with:
+        token: ${{ secrets.PUSHTOKEN }}
+        title: ${{ env.TARGET_NAME }}_Build_Completed
+        content: Congratulations,<br/>&nbsp;&nbsp;Your **${{ env.TARGET_NAME }}** padavan firmware build completed!<br/>&nbsp;&nbsp;🐮CowTransfer Download Url:${{ env.COWTRANSFER_URL }}<br/>&nbsp;&nbsp;Enjoy it🎈🎁!
